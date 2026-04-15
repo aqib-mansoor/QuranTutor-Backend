@@ -10,22 +10,34 @@ import { Feedback } from '../models/Feedback.ts';
 import { sendSuccess, sendError, getPagination } from '../utils/response.ts';
 import bcrypt from 'bcryptjs';
 
-// Teacher Management
+
 export const createTeacher = async (req: Request, res: Response) => {
   try {
-    const teacher = new User({ ...req.body, role: 'teacher' });
+    const { password } = req.body;
+
+    
+    // 1. HASH PASSWORD
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // 2. CREATE TEACHER WITH HASHED PASSWORD
+    const teacher = new User({
+      ...req.body,
+      password: hashedPassword,
+      role: "teacher",
+    });
+
     await teacher.save();
+
     sendSuccess(res, teacher, 201);
   } catch (error: any) {
     sendError(res, error.message);
   }
 };
-
 export const listTeachers = async (req: Request, res: Response) => {
   try {
     const { skip, limit, page } = getPagination(req.query);
     const search = req.query.search as string;
-    
+
     const query: any = { role: 'teacher' };
     if (search) {
       query.$or = [
@@ -36,7 +48,7 @@ export const listTeachers = async (req: Request, res: Response) => {
 
     const teachers = await User.find(query).skip(skip).limit(limit);
     const total = await User.countDocuments(query);
-    
+
     // Add student count and attendance % (simplified for now)
     const teachersWithStats = await Promise.all(teachers.map(async (t: any) => {
       const studentCount = await User.countDocuments({ teacher_id: t._id });
@@ -186,7 +198,7 @@ export const bulkCreateClasses = async (req: Request, res: Response) => {
     const classes = [];
     let current = new Date(start_date);
     const end = new Date(end_date);
-    
+
     const dayMap: any = { 'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6 };
     const targetDays = days_of_week.map((d: string) => dayMap[d]);
 
@@ -378,7 +390,7 @@ export const convertTrialToStudent = async (req: Request, res: Response) => {
   try {
     const trial: any = await TrialRequest.findById(req.params.id);
     if (!trial) return sendError(res, 'Trial request not found', 404);
-    
+
     const studentData = {
       name: req.body.name || trial.name,
       email: req.body.email || trial.email,
@@ -391,10 +403,10 @@ export const convertTrialToStudent = async (req: Request, res: Response) => {
 
     const student = new User(studentData);
     await student.save();
-    
+
     trial.status = 'converted';
     await trial.save();
-    
+
     sendSuccess(res, student, 201);
   } catch (error: any) {
     sendError(res, error.message);
