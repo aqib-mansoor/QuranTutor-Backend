@@ -103,8 +103,19 @@ export const resetTeacherPassword = async (req: Request, res: Response) => {
 // Student Management
 export const createStudent = async (req: Request, res: Response) => {
   try {
-    const student = new User({ ...req.body, role: 'student' });
+    const { password, ...rest } = req.body;
+
+    // ✅ HASH PASSWORD
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const student = new User({
+      ...rest,
+      password: hashedPassword,
+      role: "student",
+    });
+
     await student.save();
+
     sendSuccess(res, student, 201);
   } catch (error: any) {
     sendError(res, error.message);
